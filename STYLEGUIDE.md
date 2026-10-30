@@ -121,6 +121,7 @@ Fließtext höchstens 65–72 Zeichen breit. Überschriften mit `text-wrap: bala
 | `Hinweis` | Info, Warnung, Fehler im Inhalt: Titel sagt was, Text sagt, was zu tun ist |
 | `Field` + `Input` / `Textarea` / `Select` | Beschriftung **über** dem Feld, Hinweis darunter, Fehler ersetzt den Hinweis; nie nur Platzhalter |
 | `Segmented` | Umschalter für andere Darstellung oder kurze Auswahl, höchstens 5 Segmente |
+| `Panel` | Details im Kontext: am Rechner rechts 420 px, am Handy Fenster von unten; natives `<dialog>`, `Esc` und Klick daneben schließen, X-Knopf immer sichtbar |
 
 Jeder Baustein hat die Zustände Ruhe, Hover, Fokus (Ring immer sichtbar), Gedrückt und Gesperrt. Gesperrt sparsam: lieber klickbar lassen und erklären, was fehlt.
 
