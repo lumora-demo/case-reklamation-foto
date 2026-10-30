@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 // Fehlt ein Baustein, wird er zuerst hier ergänzt (und im Style-Guide beschrieben), dann verwendet.
 // Bausteine mit Zustand liegen in eigenen Dateien ("use client") und werden hier mit ausgegeben.
 export { PageHeader } from "./page-header";
+export { Panel } from "./panel";
 export { Segmented } from "./segmented";
 
 // Knöpfe: genau ein „primary“ je Ansicht. Icon links vom Text.
