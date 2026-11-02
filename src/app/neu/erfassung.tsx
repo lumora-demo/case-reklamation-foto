@@ -1,12 +1,12 @@
 "use client";
 
-import { CircleCheck, ImagePlus, PencilLine, ScanLine, ShieldCheck, Sparkles, Tag } from "lucide-react";
+import { CircleCheck, ImagePlus, PencilLine, ScanLine, ShieldCheck, Sparkles, Tag, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { KategorieName } from "@/components/reklamation";
 import { Badge, Button, ButtonLink, Card, Field, Hinweis, Input, PageHeader, Section, Select, Textarea, knopfKlasse } from "@/components/ui";
 import { de } from "@/content/de";
-import { ANGEMELDET, ETIKETTEN, findeAuftrag, findePosition, type Etikett, type Mangel, type Reklamation } from "@/lib/demo-daten";
+import { ANGEMELDET, ETIKETTEN, findeAuftrag, findePosition, type Etikett, type KiFeld, type Mangel, type Reklamation } from "@/lib/demo-daten";
 import { liesEtikett, type Quelle } from "@/lib/ki-schicht";
 import { anlegen, naechsteNummer } from "@/lib/reklamationen";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ type Feld = keyof Werte;
 
 const LEER: Werte = { auftrag: "", artikel: "", charge: "", mangel: "", menge: "", beschreibung: "" };
 const REIHENFOLGE: Feld[] = ["auftrag", "artikel", "charge", "mangel", "menge", "beschreibung"];
-const KI_FELDER = ["auftrag", "artikel", "charge"] as const;
+const KI_FELDER: KiFeld[] = ["auftrag", "artikel", "charge"];
 
 function pruefe(feld: Feld, w: Werte): string | undefined {
   switch (feld) {
@@ -45,6 +45,7 @@ export function Erfassung() {
   const [phase, setPhase] = useState<Phase>("start");
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
   const [etikett, setEtikett] = useState<Etikett | null>(null);
+  const [nichtLesbar, setNichtLesbar] = useState(false);
   const [werte, setWerte] = useState<Werte>(LEER);
   const [fehler, setFehler] = useState<Partial<Record<Feld, string>>>({});
   const [sendet, setSendet] = useState(false);
@@ -57,17 +58,22 @@ export function Erfassung() {
 
   const auftrag = findeAuftrag(werte.auftrag);
   const position = findePosition(werte.auftrag, werte.artikel);
-  const vonKi = (feld: (typeof KI_FELDER)[number]) => !!etikett && etikett[feld] === werte[feld];
+  const vonKi = (feld: KiFeld) => !!etikett && etikett[feld] === werte[feld];
+  const unsicher = (feld: KiFeld) => vonKi(feld) && !!etikett?.unsicher.includes(feld);
+  const kiTon = (feld: KiFeld) => (unsicher(feld) ? "unsicher" : vonKi(feld) ? "ki" : null);
+  const kiHinweis = (feld: KiFeld, sonst: string) => (unsicher(feld) ? t.kiUnsicher : vonKi(feld) ? t.kiHinweis : sonst);
 
   async function lies(quelle: Quelle) {
     const nr = ++lauf.current;
     setPhase("liest");
+    setNichtLesbar(false);
     setFehler({});
     setZuVersuch(false);
     const e = await liesEtikett(quelle);
     if (nr !== lauf.current) return;
     setEtikett(e);
-    setWerte((w) => ({ ...w, auftrag: e.auftrag, artikel: e.artikel, charge: e.charge }));
+    setNichtLesbar(!e);
+    if (e) setWerte((w) => ({ ...w, auftrag: e.auftrag, artikel: e.artikel, charge: e.charge }));
     setPhase("form");
   }
 
@@ -86,15 +92,23 @@ export function Erfassung() {
     lauf.current++;
     setFotoUrl(null);
     setEtikett(null);
+    setNichtLesbar(false);
     setPhase("form");
   }
 
   function setze(feld: Feld, wert: string) {
     setWerte((w) => {
       const neu = { ...w, [feld]: wert };
-      // Artikel gewählt: Charge aus dem Auftrag übernehmen, wenn noch keine eingetragen ist
-      if (feld === "artikel" && !w.charge.trim()) neu.charge = findePosition(w.auftrag, wert)?.charge ?? "";
-      if (feld === "auftrag" && !findePosition(wert, w.artikel)) neu.artikel = "";
+      // Charge gilt als übernommen, solange sie leer ist oder der Charge der bisherigen Position entspricht
+      const alteCharge = findePosition(w.auftrag, w.artikel)?.charge;
+      const uebernommen = !w.charge.trim() || w.charge.trim().toUpperCase() === alteCharge;
+      // Artikel gewählt: Charge aus dem Auftrag übernehmen, eigene Eingaben bleiben stehen
+      if (feld === "artikel" && uebernommen) neu.charge = findePosition(w.auftrag, wert)?.charge ?? "";
+      // Anderer Auftrag: Artikel passt nicht mehr, übernommene Charge auch nicht
+      if (feld === "auftrag" && !findePosition(wert, w.artikel)) {
+        neu.artikel = "";
+        if (uebernommen) neu.charge = "";
+      }
       return neu;
     });
     // Fehler verschwindet, sobald das Feld stimmt; neue Fehler erst beim Verlassen
@@ -147,6 +161,7 @@ export function Erfassung() {
     setPhase("start");
     setFotoUrl(null);
     setEtikett(null);
+    setNichtLesbar(false);
     setWerte(LEER);
     setFehler({});
     setGesendet(null);
@@ -250,13 +265,29 @@ export function Erfassung() {
                       </p>
                     ) : etikett ? (
                       <>
-                        <Badge ton="ok">
-                          <CircleCheck className="size-3.5" strokeWidth={2} aria-hidden />
-                          {t.erkannt}
-                        </Badge>
+                        {etikett.unsicher.length ? (
+                          <Badge ton="warn">
+                            <TriangleAlert className="size-3.5" strokeWidth={2} aria-hidden />
+                            {t.teilweise}
+                          </Badge>
+                        ) : (
+                          <Badge ton="ok">
+                            <CircleCheck className="size-3.5" strokeWidth={2} aria-hidden />
+                            {t.erkannt}
+                          </Badge>
+                        )}
                         <p className="text-small text-text-2">
                           {t.sicherheit} <span className="font-mono tabular-nums">{Math.round(etikett.sicherheit * 100)} %</span>
                         </p>
+                        {etikett.unsicher.length ? <p className="text-small text-text-2">{t.teilweiseText}</p> : null}
+                      </>
+                    ) : nichtLesbar ? (
+                      <>
+                        <Badge ton="warn">
+                          <TriangleAlert className="size-3.5" strokeWidth={2} aria-hidden />
+                          {t.nichtErkannt}
+                        </Badge>
+                        <p className="text-small text-text-2">{t.nichtErkanntText}</p>
                       </>
                     ) : (
                       <p className="text-small text-text-2">{t.ohneFoto}</p>
@@ -300,8 +331,8 @@ export function Erfassung() {
                 </div>
               ) : null}
 
-              <Field label={f.auftrag} hinweis={vonKi("auftrag") ? t.kiHinweis : f.auftragHinweis} fehler={fehler.auftrag}>
-                <KiRahmen ki={vonKi("auftrag")}>
+              <Field label={f.auftrag} hinweis={kiHinweis("auftrag", f.auftragHinweis)} fehler={fehler.auftrag}>
+                <KiRahmen ton={kiTon("auftrag")}>
                   <Input
                     id="feld-auftrag"
                     inputMode="numeric"
@@ -324,8 +355,8 @@ export function Erfassung() {
                 </div>
               ) : null}
 
-              <Field label={f.artikel} hinweis={vonKi("artikel") ? t.kiHinweis : f.artikelHinweis} fehler={fehler.artikel}>
-                <KiRahmen ki={vonKi("artikel")}>
+              <Field label={f.artikel} hinweis={kiHinweis("artikel", f.artikelHinweis)} fehler={fehler.artikel}>
+                <KiRahmen ton={kiTon("artikel")}>
                   <Select id="feld-artikel" value={werte.artikel} onChange={(e) => setze("artikel", e.target.value)} onBlur={verlassen("artikel")} aria-invalid={!!fehler.artikel}>
                     <option value="">{f.artikelWaehlen}</option>
                     {auftrag?.positionen.map((p) => (
@@ -342,8 +373,8 @@ export function Erfassung() {
                 </p>
               ) : null}
 
-              <Field label={f.charge} hinweis={vonKi("charge") ? t.kiHinweis : f.chargeHinweis} fehler={fehler.charge}>
-                <KiRahmen ki={vonKi("charge")}>
+              <Field label={f.charge} hinweis={kiHinweis("charge", f.chargeHinweis)} fehler={fehler.charge}>
+                <KiRahmen ton={kiTon("charge")}>
                   <Input
                     id="feld-charge"
                     autoComplete="off"
@@ -403,13 +434,19 @@ export function Erfassung() {
   );
 }
 
-// Feld, das die KI vorgeschlagen hat: kleines Symbol rechts im Feld
-function KiRahmen({ ki, children }: { ki: boolean; children: React.ReactNode }) {
+// Feld, das die KI vorgeschlagen hat: kleines Symbol rechts im Feld.
+// Unsicher gelesen: Warnsymbol; der Hinweis unter dem Feld sagt, was zu tun ist (Farbe nie allein).
+function KiRahmen({ ton, children }: { ton: "ki" | "unsicher" | null; children: React.ReactNode }) {
+  const Icon = ton === "unsicher" ? TriangleAlert : Sparkles;
   return (
     <span className="relative block">
       {children}
-      {ki ? (
-        <Sparkles className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-accent" strokeWidth={1.75} aria-hidden />
+      {ton ? (
+        <Icon
+          className={cn("pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2", ton === "unsicher" ? "text-warn" : "text-accent")}
+          strokeWidth={1.75}
+          aria-hidden
+        />
       ) : null}
     </span>
   );

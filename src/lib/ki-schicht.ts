@@ -1,4 +1,4 @@
-import { ETIKETTEN, type Etikett } from "./demo-daten";
+import { ETIKETTEN, LESBAR_AB, type Etikett } from "./demo-daten";
 
 // Zugang zur KI-Schicht (platform-ai) mit Dokumenten-Auslese (platform-documents). KI-Aufrufe nur hierüber.
 // Zielbild: POST /api/reklamationen/auslese → Lumora.Api → KI-Schicht (Datenschutz-Filter aktiv).
@@ -6,9 +6,11 @@ import { ETIKETTEN, type Etikett } from "./demo-daten";
 
 export type Quelle = { art: "beispiel"; id: string } | { art: "foto"; groesse: number };
 
-export async function liesEtikett(quelle: Quelle): Promise<Etikett> {
+// Gibt null zurück, wenn das Etikett nicht lesbar ist (dann trägt der Verarbeiter von Hand ein)
+export async function liesEtikett(quelle: Quelle): Promise<Etikett | null> {
   await new Promise((fertig) => setTimeout(fertig, 1200));
-  if (quelle.art === "beispiel") return ETIKETTEN.find((e) => e.id === quelle.id) ?? ETIKETTEN[0];
-  // Eigenes Foto: gleich bleibendes Beispiel je Bild, damit der Ablauf nachvollziehbar ist
-  return ETIKETTEN[quelle.groesse % ETIKETTEN.length];
+  const lesbare = ETIKETTEN.filter((e) => e.sicherheit >= LESBAR_AB);
+  // Eigenes Foto: gleich bleibendes lesbares Beispiel je Bild, damit der Ablauf nachvollziehbar ist
+  const e = quelle.art === "beispiel" ? (ETIKETTEN.find((x) => x.id === quelle.id) ?? lesbare[0]) : lesbare[quelle.groesse % lesbare.length];
+  return e.sicherheit >= LESBAR_AB ? e : null;
 }

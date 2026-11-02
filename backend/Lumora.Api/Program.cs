@@ -57,8 +57,11 @@ app.MapGet("/api/reklamationen", (string? status) => reklamationen.Where(r => st
 app.MapGet("/api/reklamationen/{id}", (string id) => reklamationen.FirstOrDefault(r => r.Id == id) is { } r ? Results.Ok(r) : Results.NotFound());
 
 // Foto vom Etikett lesen. Zielbild: Weitergabe an die KI-Schicht, das Foto wird nicht gespeichert.
+// Antwort im Zielbild: Etikett (Felder wie src/lib/demo-daten.ts). Unter Sicherheit 0,5 gilt das Etikett als nicht lesbar,
+// Felder in „Unsicher“ muss der Verarbeiter mit dem Etikett vergleichen.
 app.MapPost("/api/reklamationen/auslese", (IFormFile foto) =>
     Results.Problem("Die Dokumenten-Auslese ist noch im Bau. Bis dahin Angaben von Hand eintragen.", statusCode: StatusCodes.Status501NotImplemented))
+    .Produces<Etikett>()
     .DisableAntiforgery();
 
 // Reklamation anlegen: prüft Auftrag und Artikel gegen SAP und legt das Service-Ticket an
@@ -84,4 +87,5 @@ record Position(string Artikel, string Bezeichnung, string Kategorie, string Cha
 record Auftrag(string Nummer, string VerarbeiterId, string Projekt, string Geliefert, List<Position> Positionen);
 record Reklamation(string Id, string Nummer, string Auftrag, string VerarbeiterId, string Artikel, string Bezeichnung, string Kategorie, string Charge,
     string Mangel, int Menge, string Beschreibung, string Status, string Erstellt, List<string> KiFelder, bool Foto);
+record Etikett(string Id, string Name, string Auftrag, string Artikel, string Charge, double Sicherheit, List<string> Unsicher);
 record NeueReklamation(string Auftrag, string VerarbeiterId, string Artikel, string Charge, string Mangel, int Menge, string Beschreibung, List<string> KiFelder, bool Foto);

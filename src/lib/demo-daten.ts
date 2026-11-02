@@ -55,9 +55,14 @@ export interface Etikett {
   auftrag: string;
   artikel: string;
   charge: string;
-  // Sicherheit der Auslese je Feld (0–1)
+  // Sicherheit der Auslese insgesamt (0–1); unter 0,5 gilt das Etikett als nicht lesbar
   sicherheit: number;
+  // Felder, die die Auslese nur unsicher lesen konnte: Verarbeiter soll sie mit dem Etikett vergleichen
+  unsicher: KiFeld[];
 }
+
+export type KiFeld = "auftrag" | "artikel" | "charge";
+export const LESBAR_AB = 0.5;
 
 export const VERARBEITER: Verarbeiter[] = [
   { id: "v1", firma: "Metallbau Kranich GmbH", ort: "Talheim", kundennummer: "K-204711" },
@@ -102,9 +107,11 @@ export const AUFTRAEGE: Auftrag[] = [
 
 // Beispiel-Etiketten für die Vorschau: so liest die Dokumenten-Auslese ein Foto aus
 export const ETIKETTEN: Etikett[] = [
-  { id: "et1", name: "Etikett Blendrahmen", auftrag: "4500 1182", artikel: "LP-70-210", charge: "CH-26-0418", sicherheit: 0.96 },
-  { id: "et2", name: "Typenschild Türband", auftrag: "4500 1233", artikel: "BS-30-TB", charge: "CH-26-0486", sicherheit: 0.91 },
-  { id: "et3", name: "Etikett Pulverbeschichtung", auftrag: "4500 1209", artikel: "OB-7016-M", charge: "CH-26-0462", sicherheit: 0.88 },
+  { id: "et1", name: "Etikett Blendrahmen", auftrag: "4500 1182", artikel: "LP-70-210", charge: "CH-26-0418", sicherheit: 0.96, unsicher: [] },
+  { id: "et2", name: "Typenschild Türband", auftrag: "4500 1233", artikel: "BS-30-TB", charge: "CH-26-0486", sicherheit: 0.91, unsicher: [] },
+  { id: "et3", name: "Etikett Pulverbeschichtung", auftrag: "4500 1209", artikel: "OB-7016-M", charge: "CH-26-0462", sicherheit: 0.74, unsicher: ["charge"] },
+  // Unscharfes Foto: die Auslese erkennt nichts, der Verarbeiter trägt von Hand ein
+  { id: "et4", name: "Unscharfes Foto", auftrag: "", artikel: "", charge: "", sicherheit: 0.21, unsicher: ["auftrag", "artikel", "charge"] },
 ];
 
 export const REKLAMATIONEN: Reklamation[] = [
